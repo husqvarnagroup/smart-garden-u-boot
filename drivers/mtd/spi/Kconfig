@@ -49,6 +49,15 @@ config SF_DUAL_FLASH
 	  Enable this option to support two flash memories connected to a single
 	  controller. Currently Xilinx Zynq qspi supports this.
 
+config SPI_FLASH_4BYTE_MODE_ONLY
+	bool "SPI 4-byte mode only supported"
+	depends on SPI_FLASH
+	help
+	  Some SPI NOR chips only support 4-byte mode addressing. Here
+	  the default 3-byte mode does not work and leads to incorrect
+	  accesses. Setting this option enables the use of such SPI
+	  NOR chips, that only support this 4-byte mode.
+
 if SPI_FLASH
 
 config SPI_FLASH_ATMEL
