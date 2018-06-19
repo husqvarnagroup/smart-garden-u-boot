@@ -20,12 +20,19 @@
 
 #include "sf_internal.h"
 
-static void spi_flash_addr(u32 addr, u8 *cmd)
+static void spi_flash_addr(struct spi_flash *flash, u32 addr, u8 *cmd)
 {
 	/* cmd[0] is actual command */
-	cmd[1] = addr >> 16;
-	cmd[2] = addr >> 8;
-	cmd[3] = addr >> 0;
+	if (flash->in_4byte_mode) {
+		cmd[1] = addr >> 24;
+		cmd[2] = addr >> 16;
+		cmd[3] = addr >> 8;
+		cmd[4] = addr >> 0;
+	} else {
+		cmd[1] = addr >> 16;
+		cmd[2] = addr >> 8;
+		cmd[3] = addr >> 0;
+	}
 }
 
 static int read_sr(struct spi_flash *flash, u8 *rs)
@@ -109,6 +116,72 @@ static int write_cr(struct spi_flash *flash, u8 wc)
 	return 0;
 }
 #endif
+
+#if defined(CONFIG_SPI_FLASH_MACRONIX)
+static bool flash_in_4byte_mode_macronix(struct spi_flash *flash)
+{
+	int ret;
+	u8 cr;
+	u8 cmd;
+
+	cmd = 0x15;	/* Macronix: read configuration register RDCR */
+	ret = spi_flash_read_common(flash, &cmd, 1, &cr, 1);
+	if (ret < 0) {
+		debug("SF: fail to read config register\n");
+		return false;
+	}
+
+	/* Return true, if 4-byte mode is enabled */
+	if (cr & BIT(5))
+		return true;
+
+	return false;
+}
+#else
+static bool flash_in_4byte_mode_macronix(struct spi_flash *flash)
+{
+	return false;
+}
+#endif
+
+#if defined(CONFIG_SPI_FLASH_STMICRO)
+static bool flash_in_4byte_mode_stmicro(struct spi_flash *flash)
+{
+	int ret;
+	u8 fsr;
+	u8 cmd;
+
+	cmd = 0x70;	/* STMicro/Micron: read flag status register */
+	ret = spi_flash_read_common(flash, &cmd, 1, &fsr, 1);
+	if (ret < 0) {
+		debug("SF: fail to read config register\n");
+		return false;
+	}
+
+	/* Return true, if 4-byte mode is enabled */
+	if (fsr & BIT(0))
+		return true;
+
+	return false;
+}
+#else
+static bool flash_in_4byte_mode_stmicro(struct spi_flash *flash)
+{
+	return false;
+}
+#endif
+
+static bool flash_in_4byte_mode(struct spi_flash *flash,
+				const struct spi_flash_info *info)
+{
+	if (JEDEC_MFR(info) == SPI_FLASH_CFI_MFR_MACRONIX)
+		return flash_in_4byte_mode_macronix(flash);
+
+	if (JEDEC_MFR(info) == SPI_FLASH_CFI_MFR_STMICRO)
+		return flash_in_4byte_mode_stmicro(flash);
+
+	return false;
+}
 
 #ifdef CONFIG_SPI_FLASH_BAR
 /*
@@ -314,7 +387,7 @@ int spi_flash_write_common(struct spi_flash *flash, const u8 *cmd,
 int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
 {
 	u32 erase_size, erase_addr;
-	u8 cmd[SPI_FLASH_CMD_LEN];
+	u8 cmd[SPI_FLASH_CMD_MAX_LEN];
 	int ret = -1;
 
 	erase_size = flash->erase_size;
@@ -344,12 +417,13 @@ int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
 		if (ret < 0)
 			return ret;
 #endif
-		spi_flash_addr(erase_addr, cmd);
+		spi_flash_addr(flash, erase_addr, cmd);
 
 		debug("SF: erase %2x %2x %2x %2x (%x)\n", cmd[0], cmd[1],
 		      cmd[2], cmd[3], erase_addr);
 
-		ret = spi_flash_write_common(flash, cmd, sizeof(cmd), NULL, 0);
+		ret = spi_flash_write_common(flash, cmd, flash->cmdlen,
+					     NULL, 0);
 		if (ret < 0) {
 			debug("SF: erase failed\n");
 			break;
@@ -373,7 +447,7 @@ int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
 	unsigned long byte_addr, page_size;
 	u32 write_addr;
 	size_t chunk_len, actual;
-	u8 cmd[SPI_FLASH_CMD_LEN];
+	u8 cmd[SPI_FLASH_CMD_MAX_LEN];
 	int ret = -1;
 
 	page_size = flash->page_size;
@@ -404,15 +478,15 @@ int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
 
 		if (spi->max_write_size)
 			chunk_len = min(chunk_len,
-					spi->max_write_size - sizeof(cmd));
+					spi->max_write_size - flash->cmdlen);
 
-		spi_flash_addr(write_addr, cmd);
+		spi_flash_addr(flash, write_addr, cmd);
 
 		debug("SF: 0x%p => cmd = { 0x%02x 0x%02x%02x%02x } chunk_len = %zu\n",
 		      buf + actual, cmd[0], cmd[1], cmd[2], cmd[3], chunk_len);
 
-		ret = spi_flash_write_common(flash, cmd, sizeof(cmd),
-					buf + actual, chunk_len);
+		ret = spi_flash_write_common(flash, cmd, flash->cmdlen,
+					     buf + actual, chunk_len);
 		if (ret < 0) {
 			debug("SF: write failed\n");
 			break;
@@ -469,9 +543,11 @@ int spi_flash_cmd_read_ops(struct spi_flash *flash, u32 offset,
 {
 	struct spi_slave *spi = flash->spi;
 	u8 cmdsz;
-	u32 remain_len, read_len, read_addr;
+	u64 remain_len;
+	u32 read_len, read_addr;
 	int bank_sel = 0;
 	int ret = 0;
+	int shift;
 
 	/* Handle memory-mapped SPI */
 	if (flash->memory_map) {
@@ -487,7 +563,7 @@ int spi_flash_cmd_read_ops(struct spi_flash *flash, u32 offset,
 		return 0;
 	}
 
-	cmdsz = SPI_FLASH_CMD_LEN + flash->dummy_byte;
+	cmdsz = flash->cmdlen + flash->dummy_byte;
 	u8 cmd[cmdsz];
 
 	cmd[0] = flash->read_cmd;
@@ -504,8 +580,13 @@ int spi_flash_cmd_read_ops(struct spi_flash *flash, u32 offset,
 			return log_ret(ret);
 		bank_sel = flash->bank_curr;
 #endif
-		remain_len = ((SPI_FLASH_16MB_BOUN << flash->shift) *
-				(bank_sel + 1)) - offset;
+		shift = flash->shift;
+		if (flash->in_4byte_mode)
+			shift += 8;
+
+		remain_len = (((u64)SPI_FLASH_16MB_BOUN << shift) *
+			      (bank_sel + 1)) - offset;
+
 		if (len < remain_len)
 			read_len = len;
 		else
@@ -514,7 +595,7 @@ int spi_flash_cmd_read_ops(struct spi_flash *flash, u32 offset,
 		if (spi->max_read_size)
 			read_len = min(read_len, spi->max_read_size);
 
-		spi_flash_addr(read_addr, cmd);
+		spi_flash_addr(flash, read_addr, cmd);
 
 		ret = spi_flash_read_common(flash, cmd, cmdsz, data, read_len);
 		if (ret < 0) {
@@ -1156,6 +1237,13 @@ int spi_flash_scan(struct spi_flash *flash)
 		write_sr(flash, sr);
 	}
 
+	/* Set default value for cmd length */
+	flash->cmdlen = 1 + SPI_FLASH_3B_ADDR_LEN;
+	if (flash_in_4byte_mode(flash, info)) {
+		flash->in_4byte_mode = true;
+		flash->cmdlen = 1 + SPI_FLASH_4B_ADDR_LEN;
+	}
+
 	flash->name = info->name;
 	flash->memory_map = spi->memory_map;
 
@@ -1308,14 +1396,17 @@ int spi_flash_scan(struct spi_flash *flash)
 	print_size(flash->size, "");
 	if (flash->memory_map)
 		printf(", mapped at %p", flash->memory_map);
+	if (flash->in_4byte_mode)
+		printf(" (4-byte mode)");
 	puts("\n");
 #endif
 
 #ifndef CONFIG_SPI_FLASH_BAR
-	if (((flash->dual_flash == SF_SINGLE_FLASH) &&
-	     (flash->size > SPI_FLASH_16MB_BOUN)) ||
+	if ((((flash->dual_flash == SF_SINGLE_FLASH) &&
+	      (flash->size > SPI_FLASH_16MB_BOUN)) ||
 	     ((flash->dual_flash > SF_SINGLE_FLASH) &&
-	     (flash->size > SPI_FLASH_16MB_BOUN << 1))) {
+	      (flash->size > SPI_FLASH_16MB_BOUN << 1))) &&
+	    !flash->in_4byte_mode) {
 		puts("SF: Warning - Only lower 16MiB accessible,");
 		puts(" Full access #define CONFIG_SPI_FLASH_BAR\n");
 	}

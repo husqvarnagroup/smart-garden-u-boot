@@ -36,6 +36,8 @@ struct spi_slave;
  * @dual_flash:		Indicates dual flash memories - dual stacked, parallel
  * @shift:		Flash shift useful in dual parallel
  * @flags:		Indication of spi flash flags
+ * @in_4byte_mode:	True if flash is detected to be in 4-byte mode
+ * @cmdlen:		CMD length (3-byte vs 4-byte mode)
  * @size:		Total flash size
  * @page_size:		Write (page) size
  * @sector_size:	Sector size
@@ -68,6 +70,9 @@ struct spi_flash {
 	u8 dual_flash;
 	u8 shift;
 	u16 flags;
+
+	bool in_4byte_mode;
+	int cmdlen;
 
 	u32 size;
 	u32 page_size;
