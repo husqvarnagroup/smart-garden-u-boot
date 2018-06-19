@@ -23,9 +23,16 @@
 static void spi_flash_addr(u32 addr, u8 *cmd)
 {
 	/* cmd[0] is actual command */
+#ifdef CONFIG_SPI_FLASH_4BYTE_MODE_ONLY
+	cmd[1] = addr >> 24;
+	cmd[2] = addr >> 16;
+	cmd[3] = addr >> 8;
+	cmd[4] = addr >> 0;
+#else
 	cmd[1] = addr >> 16;
 	cmd[2] = addr >> 8;
 	cmd[3] = addr >> 0;
+#endif
 }
 
 static int read_sr(struct spi_flash *flash, u8 *rs)

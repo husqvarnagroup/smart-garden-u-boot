@@ -26,7 +26,12 @@ enum spi_nor_option_flags {
 };
 
 #define SPI_FLASH_3B_ADDR_LEN		3
+#define SPI_FLASH_4B_ADDR_LEN		4
+#ifdef CONFIG_SPI_FLASH_4BYTE_MODE_ONLY
+#define SPI_FLASH_CMD_LEN		(1 + SPI_FLASH_4B_ADDR_LEN)
+#else
 #define SPI_FLASH_CMD_LEN		(1 + SPI_FLASH_3B_ADDR_LEN)
+#endif
 #define SPI_FLASH_16MB_BOUN		0x1000000
 
 /* CFI Manufacture ID's */
