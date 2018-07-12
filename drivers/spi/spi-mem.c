@@ -196,12 +196,14 @@ EXPORT_SYMBOL_GPL(spi_mem_supports_op);
  */
 int spi_mem_exec_op(struct spi_slave *slave, const struct spi_mem_op *op)
 {
-	bool rx_data = op->data.nbytes && (op->data.dir == SPI_MEM_DATA_IN);
-	bool tx_data = op->data.nbytes && (op->data.dir == SPI_MEM_DATA_OUT);
 	struct udevice *bus = slave->dev->parent;
 	struct dm_spi_ops *ops = spi_get_ops(bus);
-	unsigned int xfer_len, pos = 0;
-	u8 *tx_buf, *rx_buf = NULL;
+	unsigned int pos = 0;
+	const u8 *tx_buf = NULL;
+	u8 *rx_buf = NULL;
+	u8 *op_buf;
+	int op_len;
+	u32 flag;
 	int ret;
 	int i;
 
@@ -330,67 +332,66 @@ int spi_mem_exec_op(struct spi_slave *slave, const struct spi_mem_op *op)
 		return -ENOTSUPP;
 	}
 
-	xfer_len = sizeof(op->cmd.opcode) + op->addr.nbytes +
-		   op->dummy.nbytes + op->data.nbytes;
-
-	/*
-	 * Allocate a buffer to transmit the CMD, ADDR cycles with kmalloc() so
-	 * we're guaranteed that this buffer is DMA-able, as required by the
-	 * SPI layer.
-	 */
-	tx_buf = kzalloc(xfer_len, GFP_KERNEL);
-	if (!tx_buf)
-		return -ENOMEM;
-
-	if (rx_data) {
-		rx_buf = kzalloc(xfer_len, GFP_KERNEL);
-		if (!rx_buf)
-			return -ENOMEM;
+	if (op->data.nbytes) {
+		if (op->data.dir == SPI_MEM_DATA_IN)
+			rx_buf = op->data.buf.in;
+		else
+			tx_buf = op->data.buf.out;
 	}
+
+	op_len = sizeof(op->cmd.opcode) + op->addr.nbytes + op->dummy.nbytes;
+	op_buf = calloc(1, op_len);
 
 	ret = spi_claim_bus(slave);
 	if (ret < 0)
 		return ret;
 
-	tx_buf[pos++] = op->cmd.opcode;
+	op_buf[pos++] = op->cmd.opcode;
 
 	if (op->addr.nbytes) {
 		for (i = 0; i < op->addr.nbytes; i++)
-			tx_buf[pos + i] = op->addr.val >>
-					 (8 * (op->addr.nbytes - i - 1));
+			op_buf[pos + i] = op->addr.val >>
+				(8 * (op->addr.nbytes - i - 1));
 
 		pos += op->addr.nbytes;
 	}
 
-	if (op->dummy.nbytes) {
-		memset(tx_buf + pos, 0xff, op->dummy.nbytes);
-		pos += op->dummy.nbytes;
+	if (op->dummy.nbytes)
+		memset(op_buf + pos, 0xff, op->dummy.nbytes);
+
+	/* 1st transfer: opcode + address + dummy cycles */
+	flag = SPI_XFER_BEGIN;
+	/* Make sure to set END bit if no tx or rx data messages follow */
+	if (!tx_buf && !rx_buf)
+		flag |= SPI_XFER_END;
+
+	ret = spi_xfer(slave, op_len * 8, op_buf, NULL, flag);
+	if (ret)
+		return ret;
+
+	/* 2nd transfer: rx or tx data path */
+	if (tx_buf || rx_buf) {
+		ret = spi_xfer(slave, op->data.nbytes * 8, tx_buf,
+			       rx_buf, SPI_XFER_END);
+		if (ret)
+			return ret;
 	}
 
-	if (tx_data)
-		memcpy(tx_buf + pos, op->data.buf.out, op->data.nbytes);
-
-	ret = spi_xfer(slave, xfer_len * 8, tx_buf, rx_buf,
-		       SPI_XFER_BEGIN | SPI_XFER_END);
 	spi_release_bus(slave);
 
 	for (i = 0; i < pos; i++)
-		debug("%02x ", tx_buf[i]);
+		debug("%02x ", op_buf[i]);
 	debug("| [%dB %s] ",
-	      tx_data || rx_data ? op->data.nbytes : 0,
-	      tx_data || rx_data ? (tx_data ? "out" : "in") : "-");
-	for (; i < xfer_len; i++)
-		debug("%02x ", tx_data ? tx_buf[i] : rx_buf[i]);
+	      tx_buf || rx_buf ? op->data.nbytes : 0,
+	      tx_buf || rx_buf ? (tx_buf ? "out" : "in") : "-");
+	for (i = 0; i < op->data.nbytes; i++)
+		debug("%02x ", tx_buf ? tx_buf[i] : rx_buf[i]);
 	debug("[ret %d]\n", ret);
+
+	free(op_buf);
 
 	if (ret < 0)
 		return ret;
-
-	if (rx_data)
-		memcpy(op->data.buf.in, rx_buf + pos, op->data.nbytes);
-
-	kfree(tx_buf);
-	kfree(rx_buf);
 #endif /* __UBOOT__ */
 
 	return 0;
