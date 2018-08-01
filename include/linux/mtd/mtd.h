@@ -533,5 +533,8 @@ int mtd_arg_off_size(int argc, char *const argv[], int *idx, loff_t *off,
 void mtd_get_len_incl_bad(struct mtd_info *mtd, uint64_t offset,
 			  const uint64_t length, uint64_t *len_incl_bad,
 			  int *truncated);
+
+int mtd_probe(struct udevice *dev);
+
 #endif
 #endif /* __MTD_MTD_H__ */
