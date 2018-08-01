@@ -535,6 +535,7 @@ void mtd_get_len_incl_bad(struct mtd_info *mtd, uint64_t offset,
 			  int *truncated);
 
 int mtd_probe(struct udevice *dev);
+int mtd_probe_devices(void);
 
 #endif
 #endif /* __MTD_MTD_H__ */

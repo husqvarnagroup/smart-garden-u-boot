@@ -864,6 +864,13 @@ config CMD_MMC_SWRITE
 	  Enable support for the "mmc swrite" command to write Android sparse
 	  images to eMMC.
 
+config CMD_MTD
+	bool "mtd"
+	depends on CMD_MTDPARTS
+	select MTD_PARTITIONS
+	help
+	  MTD commands support.
+
 config CMD_NAND
 	bool "nand"
 	default y if NAND_SUNXI
