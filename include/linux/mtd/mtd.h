@@ -21,6 +21,7 @@
 #include <mtd/mtd-abi.h>
 #include <linux/errno.h>
 #include <div64.h>
+#include <dm/device.h>
 
 #define MAX_MTD_DEVICES 32
 #endif
