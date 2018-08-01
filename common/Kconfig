@@ -266,7 +266,7 @@ config IDENT_STRING
 
 config LOGLEVEL
 	int "loglevel"
-	default 4
+	default 6
 	range 0 8
 	help
 	  All Messages with a loglevel smaller than the console loglevel will
