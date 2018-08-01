@@ -87,4 +87,7 @@ int mtd_add_partition(struct mtd_info *master, const char *name,
 int mtd_del_partition(struct mtd_info *master, int partno);
 uint64_t mtd_get_device_size(const struct mtd_info *mtd);
 
+int mtdparts_parse_part(struct mtd_info *parent, const char **_mtdparts,
+			struct mtd_partition **_parts, int *_nb_parts);
+
 #endif
