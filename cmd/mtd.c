@@ -355,6 +355,9 @@ static int do_mtd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			return CMD_RET_FAILURE;
 		}
 
+		printf("Erasing 0x%08llx ... 0x%08llx (%d eraseblock(s))\n",
+		       off, off + len - 1, mtd_div_by_eb(len, mtd));
+
 		erase_op.mtd = mtd;
 		erase_op.addr = off;
 		erase_op.len = len;
