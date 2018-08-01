@@ -305,9 +305,15 @@ static int get_mtd_info(u8 type, u8 num, struct mtd_info **mtd)
 
 	sprintf(mtd_dev, "%s%d", MTD_DEV_TYPE(type), num);
 	*mtd = get_mtd_device_nm(mtd_dev);
-	if (IS_ERR(*mtd)) {
-		printf("Device %s not found!\n", mtd_dev);
-		return 1;
+	if (IS_ERR_OR_NULL(*mtd)) {
+#ifdef CONFIG_CMD_MTD
+		mtd_probe_devices();
+		*mtd = get_mtd_device_nm(mtd_dev);
+#endif
+		if (IS_ERR_OR_NULL(*mtd)) {
+			printf("Device %s not found!\n", mtd_dev);
+			return 1;
+		}
 	}
 	put_mtd_device(*mtd);
 
