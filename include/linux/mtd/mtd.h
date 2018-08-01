@@ -306,6 +306,17 @@ struct mtd_info {
 	int usecount;
 };
 
+static inline void mtd_set_of_node(struct mtd_info *mtd,
+				   const struct device_node *np)
+{
+	mtd->dev->node.np = np;
+}
+
+static inline const struct device_node *mtd_get_of_node(struct mtd_info *mtd)
+{
+	return mtd->dev->node.np;
+}
+
 int mtd_ooblayout_ecc(struct mtd_info *mtd, int section,
 		      struct mtd_oob_region *oobecc);
 int mtd_ooblayout_find_eccregion(struct mtd_info *mtd, int eccbyte,
