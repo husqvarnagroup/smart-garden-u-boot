@@ -78,6 +78,7 @@
 #include <linux/ctype.h>
 #include <linux/err.h>
 #include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
 
 #if defined(CONFIG_CMD_NAND)
 #include <linux/mtd/rawnand.h>
@@ -702,6 +703,76 @@ static int part_parse(const char *const partdef, const char **ret, struct part_i
 			part->offset, part->mask_flags);
 
 	*retpart = part;
+	return 0;
+}
+
+int mtdparts_parse_part(struct mtd_info *parent, const char **_mtdparts,
+			struct mtd_partition **_parts, int *_nb_parts)
+{
+	const char *mtdparts = *_mtdparts;
+	struct part_info *part_legacy;
+	struct mtd_partition *parts;
+	int cur_off = 0, cur_sz = 0;
+	int nb_parts = 0;
+	char *names;
+	int ret, idx;
+
+	*_parts = NULL;
+	*_nb_parts = 0;
+
+	/* First, iterate over the partitions until we know their number */
+	while (mtdparts[0] != '\0' && mtdparts[0] != ';') {
+		ret = part_parse(mtdparts, &mtdparts, &part_legacy);
+		if (ret)
+			return ret;
+
+		nb_parts++;
+		free(part_legacy);
+	}
+
+	/* Allocate an array of partitions to give back to the caller */
+	parts = malloc((sizeof(*parts) + 20) * nb_parts);
+	names = (char *)&parts[nb_parts];
+	if (!parts) {
+		printf("Could not allocate enough space to save partitions meta-data\n");
+		return -ENOMEM;
+	}
+
+	/* Iterate again over each partition to save the data in our array */
+	for (idx = 0; idx < nb_parts; idx++) {
+		char *name;
+
+		ret = part_parse(*_mtdparts, _mtdparts, &part_legacy);
+		if (ret)
+			return ret;
+
+		name = &names[idx * 20];
+		strncpy(name, part_legacy->name, 20);
+		parts[idx].name = name;
+
+		parts[idx].size = part_legacy->size;
+		if (parts[idx].size == SIZE_REMAINING)
+			parts[idx].size = parent->size - cur_sz;
+		cur_sz += parts[idx].size;
+
+		parts[idx].offset = part_legacy->offset;
+		if (parts[idx].offset == OFFSET_NOT_SPECIFIED)
+			parts[idx].offset = cur_off;
+		cur_off += parts[idx].size;
+
+		parts[idx].mask_flags = part_legacy->mask_flags;
+		parts[idx].ecclayout = parent->ecclayout;
+
+		free(part_legacy);
+	}
+
+	/* Offset by one mtdparts to point to the next device if needed */
+	if (*_mtdparts[0] == ';')
+		_mtdparts++;
+
+	*_parts = parts;
+	*_nb_parts = nb_parts;
+
 	return 0;
 }
 
