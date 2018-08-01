@@ -188,7 +188,7 @@ static int do_mtd_list(void)
 
 	if (!dev_nb) {
 		printf("No MTD device found\n");
-		return -EINVAL;
+		return CMD_RET_FAILURE;
 	}
 
 	return 0;
@@ -269,13 +269,13 @@ static int do_mtd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		if (mtd_is_aligned_with_min_io_size(mtd, off)) {
 			printf("Offset not aligned with a page (0x%x)\n",
 			       mtd->writesize);
-			return -EINVAL;
+			return CMD_RET_FAILURE;
 		}
 
 		if (mtd_is_aligned_with_min_io_size(mtd, len)) {
 			printf("Size not a multiple of a page (0x%x)\n",
 			       mtd->writesize);
-			return -EINVAL;
+			return CMD_RET_FAILURE;
 		}
 
 		if (dump)
@@ -285,7 +285,7 @@ static int do_mtd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 		if (!buf) {
 			printf("Could not map/allocate the user buffer\n");
-			return -ENOMEM;
+			return CMD_RET_FAILURE;
 		}
 
 		printf("%s %lldB (%d page(s)) at offset 0x%08llx%s%s\n",
@@ -306,7 +306,7 @@ static int do_mtd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		if (ret) {
 			printf("%s on %s failed with error %d\n",
 			       read ? "Read" : "Write", mtd->name, ret);
-			return ret;
+			return CMD_RET_FAILURE;
 		}
 
 		if (dump) {
@@ -346,13 +346,13 @@ static int do_mtd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		if (mtd_is_aligned_with_block_size(mtd, off)) {
 			printf("Offset not aligned with a block (0x%x)\n",
 			       mtd->erasesize);
-			return -EINVAL;
+			return CMD_RET_FAILURE;
 		}
 
 		if (mtd_is_aligned_with_block_size(mtd, len)) {
 			printf("Size not a multiple of a block (0x%x)\n",
 			       mtd->erasesize);
-			return -EINVAL;
+			return CMD_RET_FAILURE;
 		}
 
 		erase_op.mtd = mtd;
@@ -379,7 +379,9 @@ static int do_mtd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		return CMD_RET_USAGE;
 	}
 
-	return ret;
+	if (ret)
+		return CMD_RET_FAILURE;
+	return 0;
 }
 
 static char mtd_help_text[] =
