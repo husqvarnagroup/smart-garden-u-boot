@@ -360,7 +360,21 @@ static int do_mtd(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		erase_op.len = len;
 		erase_op.scrub = scrub;
 
-		ret = mtd_erase(mtd, &erase_op);
+		while (erase_op.len) {
+			ret = mtd_erase(mtd, &erase_op);
+
+			/* Abort if its not an bad block error */
+			if (ret != -EIO)
+				break;
+
+			printf("Skipping bad block at 0x%08llx\n",
+			       erase_op.fail_addr);
+
+			/* Skip bad block and continue behind it */
+			erase_op.len -= erase_op.fail_addr - erase_op.addr;
+			erase_op.len -= mtd->erasesize;
+			erase_op.addr = erase_op.fail_addr + mtd->erasesize;
+		}
 	} else {
 		return CMD_RET_USAGE;
 	}
