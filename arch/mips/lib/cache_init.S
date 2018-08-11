@@ -84,6 +84,30 @@
 10:
 	.set	pop
 	.endm
+
+
+	.macro call_change_k0_cca	mode
+	/*
+	 * Change kernel mode cacheability which must be done from KSEG1.
+	 * If the code is executing from KSEG0, jump to KSEG1 first. After
+	 * the change jump (back) to KSEG0 to continue execution fully cached.
+	 */
+	PTR_LA		t0, change_k0_cca
+	li		t1, 0xf
+#if __mips_isa_rev >= 2
+	ins		t0, t1, 29, 1
+#else
+#error FIXME
+	ori		t0, t0, (1 << 29)
+	xori		t0, t0, (1 << 29)
+	or		t0, t0, t1
+#endif
+
+	li		a0, \mode
+	jalr		t0
+	 nop
+	.endm
+
 /*
  * mips_cache_reset - low level initialisation of the primary caches
  *
@@ -322,16 +346,7 @@ l1_init:
 
 	/* Enable use of the I-cache by setting Config.K0 */
 	sync
-	mfc0		t0, CP0_CONFIG
-	li		t1, CONFIG_SYS_MIPS_CACHE_MODE
-#if __mips_isa_rev >= 2
-	ins		t0, t1, 0, 3
-#else
-	ori		t0, t0, CONF_CM_CMASK
-	xori		t0, t0, CONF_CM_CMASK
-	or		t0, t0, t1
-#endif
-	mtc0		t0, CP0_CONFIG
+	call_change_k0_cca CONF_CM_CACHABLE_NONCOHERENT
 
 	/*
 	 * then initialize D-cache.
@@ -391,16 +406,7 @@ l2_unbypass:
 	beqz		t0, 2f
 
 	/* Change Config.K0 to a coherent CCA */
-	mfc0		t0, CP0_CONFIG
-	li		t1, CONF_CM_CACHABLE_COW
-#if __mips_isa_rev >= 2
-	ins		t0, t1, 0, 3
-#else
-	ori		t0, t0, CONF_CM_CMASK
-	xori		t0, t0, CONF_CM_CMASK
-	or		t0, t0, t1
-#endif
-	mtc0		t0, CP0_CONFIG
+	call_change_k0_cca CONF_CM_CACHABLE_COW
 
 	/*
 	 * Join the coherent domain such that the caches of this core are kept
@@ -423,6 +429,21 @@ return:
 	sync
 	jr	R_RETURN
 	END(mips_cache_reset)
+
+LEAF(change_k0_cca)
+	mfc0		t0, CP0_CONFIG
+#if __mips_isa_rev >= 2
+	ins		t0, a0, 0, 3
+#else
+	ori		t0, t0, CONF_CM_CMASK
+	xori		t0, t0, CONF_CM_CMASK
+	or		t0, t0, a0
+#endif
+	mtc0		t0, CP0_CONFIG
+
+	jalr.hb		zero, ra
+	 nop
+	END(change_k0_cca)
 
 /*
  * dcache_status - get cache status
