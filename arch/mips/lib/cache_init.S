@@ -421,7 +421,7 @@ l2_unbypass:
 return:
 	/* Ensure all cache operations complete before returning */
 	sync
-	jr	ra
+	jr	R_RETURN
 	END(mips_cache_reset)
 
 /*
