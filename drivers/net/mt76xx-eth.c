@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * (c) Stefan Roese <sr@denx.de>
+ * Copyright (C) 2018 Stefan Roese <sr@denx.de>
  *
  * MediaTek ethernet IP driver for U-Boot
+ * test-only: add based on MediaTek code ....
  */
 
 #include <common.h>
@@ -48,10 +49,9 @@
 #undef PKTBUFSRX
 #define PKTBUFSRX	NUM_RX_DESC
 
+#define PADDING_LENGTH		60
+
 #define CFG_HZ			100000 // test-only
-
-
-#define phys_to_bus(a) (a & 0x1FFFFFFF)
 
 
 #define RALINK_REG(x)		(*((volatile u32 *)(x)))
@@ -199,6 +199,8 @@
 #define SDM_RBCNT               (RALINK_FRAME_ENGINE_BASE + SDM_RELATED+0x10C) //Switch DMA rx byte count
 #define SDM_CS_ERR              (RALINK_FRAME_ENGINE_BASE + SDM_RELATED+0x110) //Switch DMA rx checksum error count
 
+// test-only: don't use bit masks here but normal structs (Linux driver)
+#if 0
 /*=========================================
       PDMA RX Descriptor Format define
 =========================================*/
@@ -210,6 +212,8 @@ struct _PDMA_RXD_INFO1_
 {
     unsigned int    PDP0;
 };
+
+
 //-------------------------------------------------
 typedef struct _PDMA_RXD_INFO2_    PDMA_RXD_INFO2_T;
 
@@ -306,6 +310,57 @@ struct PDMA_txdesc {
 	PDMA_TXD_INFO4_T txd_info4;
 };
 
+#else
+
+/* rxd2 */
+#define RX_DMA_DONE		BIT(31)
+#define RX_DMA_LSO		BIT(30)
+#define RX_DMA_PLEN0(_x)	(((_x) & 0x3fff) << 16)
+#define RX_DMA_GET_PLEN0(_x)	(((_x) >> 16) & 0x3fff)
+#define RX_DMA_TAG		BIT(15)
+/* rxd3 */
+#define RX_DMA_TPID(_x)		(((_x) >> 16) & 0xffff)
+#define RX_DMA_VID(_x)		((_x) & 0xffff)
+/* rxd4 */
+#define RX_DMA_L4VALID		BIT(30)
+
+struct fe_rx_dma {
+	unsigned int rxd1;
+	unsigned int rxd2;
+	unsigned int rxd3;
+	unsigned int rxd4;
+} __packed __aligned(4);
+
+#define TX_DMA_BUF_LEN		0x3fff
+#define TX_DMA_PLEN0_MASK	(TX_DMA_BUF_LEN << 16)
+#define TX_DMA_PLEN0(_x)	(((_x) & TX_DMA_BUF_LEN) << 16)
+#define TX_DMA_PLEN1(_x)	((_x) & TX_DMA_BUF_LEN)
+#define TX_DMA_GET_PLEN0(_x)    (((_x) >> 16) & TX_DMA_BUF_LEN)
+#define TX_DMA_GET_PLEN1(_x)    ((_x) & TX_DMA_BUF_LEN)
+#define TX_DMA_LS1		BIT(14)
+#define TX_DMA_LS0		BIT(30)
+#define TX_DMA_DONE		BIT(31)
+
+#define TX_DMA_INS_VLAN_MT7621	BIT(16)
+#define TX_DMA_INS_VLAN		BIT(7)
+#define TX_DMA_INS_PPPOE	BIT(12)
+#define TX_DMA_QN(_x)		((_x) << 16)
+#define TX_DMA_PN(_x)		((_x) << 24)
+#define TX_DMA_QN_MASK		TX_DMA_QN(0x7)
+#define TX_DMA_PN_MASK		TX_DMA_PN(0x7)
+#define TX_DMA_UDF		BIT(20)
+#define TX_DMA_CHKSUM		(0x7 << 29)
+#define TX_DMA_TSO		BIT(28)
+
+struct fe_tx_dma {
+	unsigned int txd1;
+	unsigned int txd2;
+	unsigned int txd3;
+	unsigned int txd4;
+} __packed __aligned(4);
+
+#endif
+
 
 static int rx_dma_owner_idx0;	/* Point to the next RXD DMA wants to use in RXD Ring#0.  */
 static int rx_wants_alloc_idx0;	/* Point to the next RXD CPU wants to allocate to RXD Ring #0. */
@@ -319,8 +374,13 @@ struct mt76xx_eth_dev {
 
 //	u8 rx_buf[EMAC_RX_BUFSIZE];
 	// test-only: this cache stuff needed???
+#if 0
 	struct PDMA_txdesc *tx_ring;
 	struct PDMA_rxdesc *rx_ring;
+#else
+	struct fe_tx_dma *tx_ring;
+	struct fe_rx_dma *rx_ring;
+#endif
 
 	u8 *rx_buf[NUM_RX_DESC];
 };
@@ -593,35 +653,28 @@ static int mt76xx_eth_write_hwaddr(struct udevice *dev)
 }
 
 static int mt76xx_eth_recv(struct udevice *dev, int flags, uchar **packetp); // test-only
+
 static int mt76xx_eth_start(struct udevice *dev)
 {
-//	struct eth_pdata *pdata = dev_get_platdata(dev);
 	struct mt76xx_eth_dev *priv = dev_get_priv(dev);
-	int i;
 	u32 val;
-
-#if 0 // test-only: really needed????
-//	printf("\n Waitting for RX_DMA_BUSY status Start... ");
-	while (1) {
-//		if (!isDMABusy(dev))
-		if (!eth_dma_busy(dev))
-			break;
-	}
-//	printf("done\n");
-#endif
+	int i;
 
 	for (i = 0; i < NUM_RX_DESC; i++) {
-		memset((void *)&priv->rx_ring[i], 0, 16);
+		memset((void *)&priv->rx_ring[i], 0, sizeof(priv->rx_ring[0]));
+#if 0
 		priv->rx_ring[i].rxd_info2.DDONE_bit = 0;
 		priv->rx_ring[i].rxd_info2.LS0 = 1;
-		priv->rx_ring[i].rxd_info1.PDP0 =
-			cpu_to_le32(phys_to_bus((u32)priv->rx_buf[i]));
-//		memset(priv->rx_buf[i], 0xaa, 512); // test-only
-//		flush_dcache_range((u32)priv->rx_buf[i], (u32)priv->rx_buf[i] + 512 - 1); // test-only
+		priv->rx_ring[i].rxd_info1.PDP0 = CPHYSADDR(priv->rx_buf[i]);
+#else
+		priv->rx_ring[i].rxd2 |= RX_DMA_LSO;
+		priv->rx_ring[i].rxd1 = CPHYSADDR(priv->rx_buf[i]);
+#endif
 	}
 
 	for (i = 0; i < NUM_TX_DESC; i++) {
-		memset((void *)&priv->tx_ring[i], 0, 16);
+		memset((void *)&priv->tx_ring[i], 0, sizeof(priv->tx_ring[0]));
+#if 0
 		priv->tx_ring[i].txd_info2.LS0_bit = 1;
 		priv->tx_ring[i].txd_info2.DDONE_bit = 1;
 		/* PN:
@@ -632,6 +685,10 @@ static int mt76xx_eth_start(struct udevice *dev)
 		 *  7:Discard
 		 */
 		priv->tx_ring[i].txd_info4.PN = 1;
+#else
+		priv->tx_ring[i].txd2 = TX_DMA_LS0 | TX_DMA_DONE;
+		priv->tx_ring[i].txd4 = TX_DMA_PN(1);
+#endif
 	}
 
 	rx_dma_owner_idx0 = 0;
@@ -657,10 +714,10 @@ static int mt76xx_eth_start(struct udevice *dev)
 	wmb(); // test-only
 
 	/* Tell the adapter where the TX/RX rings are located. */
-	RALINK_REG(RX_BASE_PTR0) = phys_to_bus((u32)&priv->rx_ring[0]);
+	RALINK_REG(RX_BASE_PTR0) = CPHYSADDR(&priv->rx_ring[0]);
 
 	//printf("\n rx_ring=%08X ,RX_BASE_PTR0 = %08X \n",&rx_ring[0],RALINK_REG(RX_BASE_PTR0));
-	RALINK_REG(TX_BASE_PTR0) = phys_to_bus((u32)&priv->tx_ring[0]);
+	RALINK_REG(TX_BASE_PTR0) = CPHYSADDR((u32)&priv->tx_ring[0]);
 
 	//printf("\n tx_ring0=%08X, TX_BASE_PTR0 = %08X \n",&tx_ring0[0],RALINK_REG(TX_BASE_PTR0));
 
@@ -715,22 +772,27 @@ static int mt76xx_eth_start(struct udevice *dev)
 
 static int mt76xx_eth_send(struct udevice *dev, void *packet, int length)
 {
-//	struct eth_pdata *pdata = dev_get_platdata(dev);
 	struct mt76xx_eth_dev *priv = dev_get_priv(dev);
 	char *p = (char *)packet; // test-only: needed??
-	u32 temp;
+//	int timeout = CONFIG_TX_DMA_TIMEOUT;
+//	int start;
+	u32 tmp;
 	int i;
 
-//	printf("%s (%d): tx_cpu_owner_idx0=%d\n", __func__, __LINE__, tx_cpu_owner_idx0); // test-only
-
-#define PADDING_LENGTH 60
+	/* Pad message to a minimum length */
 	if (length < PADDING_LENGTH) {
-		//	print_packet(packet,length);
-		for(i = 0; i < PADDING_LENGTH - length; i++)
+		for (i = 0; i < PADDING_LENGTH - length; i++)
 			p[length + i] = 0;
 		length = PADDING_LENGTH;
 	}
 
+#if 0 // test-only: change to using no bitmasks and then wait_timeout_bit()
+	start = get_timer(0);
+	while (get_timer(start) < timeout) {
+	}
+#endif
+
+#if 0
 	for (i = 0; priv->tx_ring[tx_cpu_owner_idx0].txd_info2.DDONE_bit == 0;
 	     i++) {
 		if (i >= TOUT_LOOP) {
@@ -739,29 +801,32 @@ static int mt76xx_eth_send(struct udevice *dev, void *packet, int length)
 			return 0; // test-only: return with error on timeout?
 		}
 	}
+#endif
 
-	temp = RALINK_REG(TX_DTX_IDX0);
+	tmp = RALINK_REG(TX_DTX_IDX0);
 
-	if (temp == (tx_cpu_owner_idx0 + 1) % NUM_TX_DESC) {
+	if (tmp == (tx_cpu_owner_idx0 + 1) % NUM_TX_DESC) {
 		puts(" @ ");
 		printf("%s (%d)!!!!!!!!!!!!!!!!!!!!!!\n", __func__, __LINE__); // test-only
 //		goto Done;
 		return 0; // test-only: return with error on timeout?
 	}
 
-#if 1
 	flush_dcache_range((u32)packet, (u32)packet + length - 1); // test-only
-#else
-	memcpy((void *)KSEG1ADDR(packet), packet, length);
-#endif
-	priv->tx_ring[tx_cpu_owner_idx0].txd_info1.SDP0 =
-		cpu_to_le32(phys_to_bus((u32)packet));
+#if 0
+	priv->tx_ring[tx_cpu_owner_idx0].txd_info1.SDP0 = CPHYSADDR(packet);
 	priv->tx_ring[tx_cpu_owner_idx0].txd_info2.SDL0 = length;
-//	printf("%s (%d): addr=%08x (%08x) length=%d\n", __func__, __LINE__, cpu_to_le32(phys_to_bus((u32)packet)), (u32)packet, length); // test-only
+#else
+	priv->tx_ring[tx_cpu_owner_idx0].txd1 = CPHYSADDR(packet);
+	priv->tx_ring[tx_cpu_owner_idx0].txd2 |= TX_DMA_PLEN0(length);
+#endif
 //	print_hex_dump_bytes("TX: ", DUMP_PREFIX_OFFSET, packet, length); // test-only
 
+#if 0
 	priv->tx_ring[tx_cpu_owner_idx0].txd_info2.DDONE_bit = 0;
-//	status = length;
+#else
+	priv->tx_ring[tx_cpu_owner_idx0].txd2 &= ~TX_DMA_DONE;
+#endif
 
 	// test-only: do we need to increment here, if tx_ids is 1 ???
 	tx_cpu_owner_idx0 = (tx_cpu_owner_idx0 + 1) % NUM_TX_DESC;
@@ -790,17 +855,18 @@ static int mt76xx_eth_recv(struct udevice *dev, int flags, uchar **packetp)
 	rxd_info = (u32 *)KSEG1ADDR(
 		&priv->rx_ring[rx_dma_owner_idx0].rxd_info2);
 #else
-	rxd_info = (u32 *)&priv->rx_ring[rx_dma_owner_idx0].rxd_info2;
+	rxd_info = (u32 *)&priv->rx_ring[rx_dma_owner_idx0].rxd2;
 #endif
 //	printf("%s (%d): rxd_info=%08x @ %p\n", __func__, __LINE__, *rxd_info, rxd_info); // test-only
 
-	if ((*rxd_info & BIT(31)) == 0) {
+	// test-only: use accessor functions??? or just use value instead
+	if ((*rxd_info & RX_DMA_DONE) == 0) {
 //		printf("%s (%d): BIT 31 is 0\n", __func__, __LINE__); // test-only
 		return -EAGAIN;
 	}
 
 	udelay(1); // test-only: needed???
-	length = priv->rx_ring[rx_dma_owner_idx0].rxd_info2.PLEN0;
+	length = RX_DMA_GET_PLEN0(priv->rx_ring[rx_dma_owner_idx0].rxd2);
 //	printf("%s (%d): length=%d\n", __func__, __LINE__, length); // test-only
 	if (length >= MTK_QDMA_PAGE_SIZE)
 		printf("%s (%d): length too big=%d !!!!!!!!!!!\n", __func__, __LINE__, length); // test-only
@@ -809,7 +875,8 @@ static int mt76xx_eth_recv(struct udevice *dev, int flags, uchar **packetp)
 		printf("\n Warring!! Packet Length has error !!,In normal mode !\n");
 	}
 
-	if (priv->rx_ring[rx_dma_owner_idx0].rxd_info4.SP == 0) {
+#if 0 // test-only: SP not defined in Linux driver
+	if (priv->rx_ring[rx_dma_owner_idx0].rxd4.SP == 0) {
 		// Packet received from CPU port
 		printf("\n Normal Mode,Packet received from CPU port,plen=%d !!!!!!!!!!!!!!!!!!!!!!!! \n",length);
 		//print_packet((void *)KSEG1ADDR(NetRxPackets[rx_dma_owner_idx0]),length);
@@ -830,13 +897,31 @@ static int mt76xx_eth_recv(struct udevice *dev, int flags, uchar **packetp)
 //		NetReceive((void *)KSEG1ADDR(NetRxPackets[rx_dma_owner_idx0]), length );
 //		print_hex_dump_bytes("RX: ", DUMP_PREFIX_OFFSET, *packetp, length); // test-only
 	}
+#else
+#if 0
+	printf("%s (%d): REAL RX here: rx_buf=%p KSEG=%x\n", __func__, __LINE__, priv->rx_buf[rx_dma_owner_idx0], KSEG1ADDR(priv->rx_buf[rx_dma_owner_idx0])); // test-only
+#endif
+#if 0
+	*packetp = (uchar *)KSEG1ADDR(priv->rx_buf[rx_dma_owner_idx0]);
+#else
+	*packetp = priv->rx_buf[rx_dma_owner_idx0];
+	invalidate_dcache_range((u32)*packetp, (u32)*packetp + length - 1); // test-only
+#endif
+//	NetReceive((void *)KSEG1ADDR(NetRxPackets[rx_dma_owner_idx0]), length );
+//	print_hex_dump_bytes("RX: ", DUMP_PREFIX_OFFSET, *packetp, length); // test-only
+#endif
 
+#if 0
 	rxd_info = (u32 *)&priv->rx_ring[rx_dma_owner_idx0].rxd_info4;
 	*rxd_info = 0;
 
 	rxd_info = (u32 *)&priv->rx_ring[rx_dma_owner_idx0].rxd_info2;
 	*rxd_info = 0;
 	priv->rx_ring[rx_dma_owner_idx0].rxd_info2.LS0 = 1;
+#else
+	priv->rx_ring[rx_dma_owner_idx0].rxd4 = 0;
+	priv->rx_ring[rx_dma_owner_idx0].rxd2 = RX_DMA_LSO;
+#endif
 
 	wmb(); // test-only
 
@@ -862,79 +947,21 @@ static void mt76xx_eth_stop(struct udevice *dev)
 
 static int mt76xx_eth_probe(struct udevice *dev)
 {
-//	struct eth_pdata *pdata = dev_get_platdata(dev);
 	struct mt76xx_eth_dev *priv = dev_get_priv(dev);
-	int i;
-
 	struct mii_dev *bus;
 	int ret;
+	int i;
 
-#if 0
-	PktBuf = Pkt_Buf_Pool;
-	PKT_HEADER_Buf = PKT_HEADER_Buf_Pool;
-	NetTxPacket = NULL;
-	rx_ring = (struct PDMA_rxdesc *)KSEG1ADDR((ulong)&rx_ring_cache[0]);
-	tx_ring0 = (struct PDMA_txdesc *)KSEG1ADDR((ulong)&tx_ring0_cache[0]);
-
-	rt2880_free_buf_list.head = NULL;
-	rt2880_free_buf_list.tail = NULL;
-
-	rt2880_busing_buf_list.head = NULL;
-	rt2880_busing_buf_list.tail = NULL;
-
-	//2880_free_buf
-
-	/*
-	 *	Setup packet buffers, aligned correctly.
-	 */
-	rt2880_free_buf[0].pbuf = (unsigned char *)(&PktBuf[0] + (PKTALIGN - 1));
-	rt2880_free_buf[0].pbuf -= (ulong)rt2880_free_buf[0].pbuf % PKTALIGN;
-	rt2880_free_buf[0].next = NULL;
-
-	rt2880_free_buf_entry_enqueue(&rt2880_free_buf_list,&rt2880_free_buf[0]);
-
-#ifdef DEBUG
-	printf("\n rt2880_free_buf[0].pbuf = 0x%08X \n",rt2880_free_buf[0].pbuf);
-#endif
-	for (i = 1; i < PKTBUFSRX; i++) {
-		rt2880_free_buf[i].pbuf = rt2880_free_buf[0].pbuf + (i)*PKTSIZE_ALIGN;
-		rt2880_free_buf[i].next = NULL;
-#ifdef DEBUG
-		printf("\n rt2880_free_buf[%d].pbuf = 0x%08X\n",i,rt2880_free_buf[i].pbuf);
-#endif
-		rt2880_free_buf_entry_enqueue(&rt2880_free_buf_list,&rt2880_free_buf[i]);
-	}
-
-	for (i = 0; i < PKTBUFSRX; i++)
-	{
-		rt2880_free_buf[i].tx_idx = NUM_TX_DESC;
-#ifdef DEBUG
-		printf("\n rt2880_free_buf[%d] = 0x%08X,rt2880_free_buf[%d].next=0x%08X \n",i,&rt2880_free_buf[i],i,rt2880_free_buf[i].next);
-#endif
-	}
-
-#else
-	// test-only: KSEG1ADDR really needed on this ARCH???
-	priv->tx_ring = (struct PDMA_txdesc *)KSEG1ADDR(
+	/* Put rx and tx rings into KSEG1 area (uncached) */
+	priv->tx_ring = (struct fe_tx_dma *)KSEG1ADDR(
 		memalign(ARCH_DMA_MINALIGN,
 			 sizeof(*priv->tx_ring) * NUM_TX_DESC));
-	priv->rx_ring = (struct PDMA_rxdesc *)KSEG1ADDR(
+	priv->rx_ring = (struct fe_rx_dma *)KSEG1ADDR(
 		memalign(ARCH_DMA_MINALIGN,
 			 sizeof(*priv->rx_ring) * NUM_RX_DESC));
-//	printf("tx_ring=%p\n", priv->tx_ring); // test-only
-//	printf("rx_ring=%p\n", priv->rx_ring); // test-only
 
-	for (i = 0; i < NUM_RX_DESC; i++) {
+	for (i = 0; i < NUM_RX_DESC; i++)
 		priv->rx_buf[i] = memalign(PKTALIGN, MTK_QDMA_PAGE_SIZE);
-//		printf("rx_buf[%d]=%p\n", i, priv->rx_buf[i]); // test-only
-	}
-
-#endif
-
-
-
-
-
 
 #if 1 // test-only: whats this all about - check linux driver...
 	//set clock resolution
@@ -947,8 +974,7 @@ static int mt76xx_eth_probe(struct udevice *dev)
 		cpu_to_le32(val);
 #endif
 
-
-
+	/* Switch configuration */
 	rt305x_esw_init();
 
 	bus = mdio_alloc();
@@ -960,13 +986,10 @@ static int mt76xx_eth_probe(struct udevice *dev)
 	bus->read = mt76xx_mdio_read;
 	bus->write = mt76xx_mdio_write;
 	snprintf(bus->name, sizeof(bus->name), dev->name);
-//	bus->priv = (void *)pp;
-//	pp->bus = bus;
 
 	ret = mdio_register(bus);
 	if (ret)
 		return ret;
-//	dcache_disable(); // test-only
 
 	return 0;
 }
