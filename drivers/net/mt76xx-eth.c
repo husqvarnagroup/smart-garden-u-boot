@@ -6,7 +6,6 @@
  * test-only: add based on MediaTek code ....
  */
 
-// test-only: sort alpha...
 #include <common.h>
 #include <dm.h>
 #include <hexdump.h> // test-only
@@ -14,8 +13,7 @@
 #include <malloc.h>
 #include <miiphy.h>
 #include <net.h>
-#include <linux/io.h>
-//#include <asm/io.h>
+#include <asm/io.h>
 
 
 #if 0 // test-only
@@ -55,7 +53,7 @@
 
 #define CFG_HZ			100000 // test-only
 
-#if 1
+
 #define RALINK_REG(x)		(*((volatile u32 *)(x)))
 
 #define ra_inb(offset)		(*(volatile unsigned char *)(offset))
@@ -73,7 +71,6 @@
 
 #define outw(address, value)    *((volatile uint32_t *)(address)) = cpu_to_le32(value)
 #define inw(address)            le32_to_cpu(*(volatile u32 *)(address))
-#endif
 
 #define PHY_CONTROL_0 		0xC0
 #define PHY_CONTROL_1 		0xC4
@@ -141,8 +138,6 @@
 #define TX_DLY_INT       BIT(1)
 #define RX_DLY_INT       BIT(0)
 
-
-// test-only: comments and what is all really needed???
 /*
  * Ethernet chip registers.RT2880
  */
@@ -204,6 +199,118 @@
 #define SDM_RBCNT               (RALINK_FRAME_ENGINE_BASE + SDM_RELATED+0x10C) //Switch DMA rx byte count
 #define SDM_CS_ERR              (RALINK_FRAME_ENGINE_BASE + SDM_RELATED+0x110) //Switch DMA rx checksum error count
 
+// test-only: don't use bit masks here but normal structs (Linux driver)
+#if 0
+/*=========================================
+      PDMA RX Descriptor Format define
+=========================================*/
+
+//-------------------------------------------------
+typedef struct _PDMA_RXD_INFO1_  PDMA_RXD_INFO1_T;
+
+struct _PDMA_RXD_INFO1_
+{
+    unsigned int    PDP0;
+};
+
+
+//-------------------------------------------------
+typedef struct _PDMA_RXD_INFO2_    PDMA_RXD_INFO2_T;
+
+struct _PDMA_RXD_INFO2_
+{
+	unsigned int    PLEN1                   : 14;
+	unsigned int    LS1                     : 1;
+	unsigned int    UN_USED                 : 1;
+	unsigned int    PLEN0                   : 14;
+	unsigned int    LS0                     : 1;
+	unsigned int    DDONE_bit               : 1;
+};
+//-------------------------------------------------
+typedef struct _PDMA_RXD_INFO3_  PDMA_RXD_INFO3_T;
+
+struct _PDMA_RXD_INFO3_
+{
+	unsigned int    PDP1;
+};
+//-------------------------------------------------
+typedef struct _PDMA_RXD_INFO4_    PDMA_RXD_INFO4_T;
+
+struct _PDMA_RXD_INFO4_
+{
+	unsigned int    FOE_Entry               : 14;
+	unsigned int    FVLD                    : 1;
+	unsigned int    UN_USE1                 : 1;
+	unsigned int    AI                      : 8;
+	unsigned int    SP                      : 3;
+	unsigned int    AIS                     : 1;
+	unsigned int    L4F                     : 1;
+	unsigned int    IPF                     : 1;
+	unsigned int    L4FVLD_bit              : 1;
+	unsigned int    IPFVLD_bit              : 1;
+};
+
+struct PDMA_rxdesc {
+	PDMA_RXD_INFO1_T rxd_info1;
+	PDMA_RXD_INFO2_T rxd_info2;
+	PDMA_RXD_INFO3_T rxd_info3;
+	PDMA_RXD_INFO4_T rxd_info4;
+};
+/*=========================================
+      PDMA TX Descriptor Format define
+=========================================*/
+//-------------------------------------------------
+typedef struct _PDMA_TXD_INFO1_  PDMA_TXD_INFO1_T;
+
+struct _PDMA_TXD_INFO1_
+{
+	unsigned int    SDP0;
+};
+//-------------------------------------------------
+typedef struct _PDMA_TXD_INFO2_    PDMA_TXD_INFO2_T;
+
+struct _PDMA_TXD_INFO2_
+{
+	unsigned int    SDL1                  : 14;
+	unsigned int    LS1_bit               : 1;
+	unsigned int    BURST_bit             : 1;
+	unsigned int    SDL0                  : 14;
+	unsigned int    LS0_bit               : 1;
+	unsigned int    DDONE_bit             : 1;
+};
+//-------------------------------------------------
+typedef struct _PDMA_TXD_INFO3_  PDMA_TXD_INFO3_T;
+
+struct _PDMA_TXD_INFO3_
+{
+	unsigned int    SDP1;
+};
+//-------------------------------------------------
+typedef struct _PDMA_TXD_INFO4_    PDMA_TXD_INFO4_T;
+
+struct _PDMA_TXD_INFO4_
+{
+    unsigned int    VIDX		: 4;
+    unsigned int    VPRI                : 3;
+    unsigned int    INSV                : 1;
+    unsigned int    SIDX                : 4;
+    unsigned int    INSP                : 1;
+    unsigned int    UN_USE3             : 3;
+    unsigned int    QN                  : 3;
+    unsigned int    UN_USE2             : 5;
+    unsigned int    PN                  : 3;
+    unsigned int    UN_USE1             : 2;
+    unsigned int    TUI_CO              : 3;
+};
+
+struct PDMA_txdesc {
+	PDMA_TXD_INFO1_T txd_info1;
+	PDMA_TXD_INFO2_T txd_info2;
+	PDMA_TXD_INFO3_T txd_info3;
+	PDMA_TXD_INFO4_T txd_info4;
+};
+
+#else
 
 /* rxd2 */
 #define RX_DMA_DONE		BIT(31)
@@ -252,6 +359,7 @@ struct fe_tx_dma {
 	unsigned int txd4;
 } __packed __aligned(4);
 
+#endif
 
 
 static int rx_dma_owner_idx0;	/* Point to the next RXD DMA wants to use in RXD Ring#0.  */
@@ -264,8 +372,15 @@ struct mt76xx_eth_dev {
 	struct phy_device *phydev;
 	int link_printed;
 
+//	u8 rx_buf[EMAC_RX_BUFSIZE];
+	// test-only: this cache stuff needed???
+#if 0
+	struct PDMA_txdesc *tx_ring;
+	struct PDMA_rxdesc *rx_ring;
+#else
 	struct fe_tx_dma *tx_ring;
 	struct fe_rx_dma *rx_ring;
+#endif
 
 	u8 *rx_buf[NUM_RX_DESC];
 };
@@ -276,7 +391,7 @@ struct mt76xx_eth_dev {
 // test-only: CFG_HZ ???
 #define CONFIG_MDIO_TIMEOUT	100
 
-static int mdio_wait_read(phys_addr_t iobase, u32 mask, bool mask_set)
+static int mdio_wait_read(u32 mask, bool mask_set)
 {
 	int timeout = CONFIG_MDIO_TIMEOUT;
 	int start;
@@ -284,10 +399,10 @@ static int mdio_wait_read(phys_addr_t iobase, u32 mask, bool mask_set)
 	start = get_timer(0);
 	while (get_timer(start) < timeout) {
 		if (mask_set) {
-			if (ioread32(MDIO_PHY_CONTROL_1) & mask)
+			if (inw(MDIO_PHY_CONTROL_1) & mask)
 				return 0;
 		} else {
-			if (!(ioread32(MDIO_PHY_CONTROL_1) & mask))
+			if (!(inw(MDIO_PHY_CONTROL_1) & mask))
 				return 0;
 		}
 	}
