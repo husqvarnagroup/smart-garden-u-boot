@@ -10,7 +10,6 @@
 #define CONFIG_SYS_MIPS_TIMER_FREQ	200000000
 
 /* RAM */
-#define CONFIG_NR_DRAM_BANKS		1
 #define CONFIG_SYS_SDRAM_BASE		0x80000000
 
 #define CONFIG_SYS_LOAD_ADDR		CONFIG_SYS_SDRAM_BASE + 0x100000
@@ -39,7 +38,7 @@
 #define CONFIG_SYS_MONITOR_BASE		CONFIG_SYS_TEXT_BASE
 
 /* Environment settings */
-#define CONFIG_ENV_OFFSET		0x80000
+#define CONFIG_ENV_OFFSET		0xa0000
 #define CONFIG_ENV_SIZE			(64 << 10)
 #define CONFIG_ENV_SECT_SIZE		(64 << 10)
 #define CONFIG_SYS_REDUNDAND_ENVIRONMENT
@@ -52,5 +51,17 @@
  * doesn't grow into the environment area.
  */
 #define CONFIG_BOARD_SIZE_LIMIT		CONFIG_ENV_OFFSET
+
+#define CONFIG_EXTRA_ENV_SETTINGS				\
+	"bootcmd=ping ${serverip};run net_nfs\0"		\
+	"loadaddr=0x81000000\0"					\
+	"tftpdir=gardena\0"					\
+	"tftpram=tftp 80010000 ${tftpdir}/u-boot.bin;go 80010000\0" \
+	"net_nfs=tftp 80a00000 /tftpboot/gardena/uImage;setenv rootpath /tftpboot/gardena/work/rootfs/yocto-2018-08-09;setenv bootargs console=ttyS0,57600 root=/dev/nfs rw nfsroot=${serverip}:${rootpath},tcp,nfsvers=3 ip=${ipaddr}:${serverip}::${netmask}:${hostname}:eth0:off;bootm 80a00000\0"		\
+	"net_ubifs=tftp 80a00000 /tftpboot/gardena/uImage;setenv bootargs root=ubi0:overlay rootfstype=ubifs ubi.mtd=5 init=/sbin/init;bootm 80a00000\0" \
+	"load_uboot=tftp ${loadaddr} ${tftpdir}/u-boot.bin\0"	\
+	"update_uboot=sf probe;"				\
+		"sf update ${loadaddr} 0 ${filesize};saveenv\0"	\
+	"upd_uboot=run load_uboot update_uboot\0"
 
 #endif /* __CONFIG_GARDENA_SMART_GATEWAY_H */
