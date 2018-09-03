@@ -74,6 +74,7 @@ config ARCH_MT7620
 	select DISPLAY_CPUINFO
 	select DM
 	select DM_ETH
+	imply DM_GPIO
 	select DM_SERIAL
 	imply DM_SPI
 	imply DM_SPI_FLASH
