@@ -6,6 +6,7 @@
 /dts-v1/;
 
 #include "mt7628a.dtsi"
+#include <dt-bindings/gpio/gpio.h>
 
 / {
 	compatible = "gardena,smart-gateway-mt7688", "ralink,mt7628a-soc";
@@ -19,6 +20,41 @@
 	memory@0 {
 		device_type = "memory";
 		reg = <0x0 0x08000000>;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		blue_led1 {
+			label = "smartgw:blue:led1";
+			gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+			default-state = "on";
+		};
+
+		green_led1 {
+			label = "smartgw:green:led1";
+			gpios = <&gpio0 19 GPIO_ACTIVE_HIGH>;
+		};
+
+		red_led1 {
+			label = "smartgw:red:led1";
+			gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>;
+		};
+
+		blue_led2 {
+			label = "smartgw:blue:led2";
+			gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+		};
+
+		green_led2 {
+			label = "smartgw:green:led2";
+			gpios = <&gpio0 27 GPIO_ACTIVE_HIGH>;
+		};
+
+		red_led2 {
+			label = "smartgw:red:led2";
+			gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
+		};
 	};
 
 	chosen {
