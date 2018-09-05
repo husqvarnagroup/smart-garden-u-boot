@@ -391,6 +391,27 @@ __BUILDIO(q, u64)
 #define readq				readq
 #define writeq				writeq
 
+/* in_le32(), out_le32() and friends */
+#define out_arch(type,endian,a,v)	__raw_write##type(cpu_to_##endian(v),a)
+#define in_arch(type,endian,a)		endian##_to_cpu(__raw_read##type(a))
+
+#define out_le64(a,v)	out_arch(q,le64,a,v)
+#define out_le32(a,v)	out_arch(l,le32,a,v)
+#define out_le16(a,v)	out_arch(w,le16,a,v)
+
+#define in_le64(a)	in_arch(q,le64,a)
+#define in_le32(a)	in_arch(l,le32,a)
+#define in_le16(a)	in_arch(w,le16,a)
+
+#define out_be32(a,v)	out_arch(l,be32,a,v)
+#define out_be16(a,v)	out_arch(w,be16,a,v)
+
+#define in_be32(a)	in_arch(l,be32,a)
+#define in_be16(a)	in_arch(w,be16,a)
+
+#define out_8(a,v)	__raw_writeb(v,a)
+#define in_8(a)		__raw_readb(a)
+
 #define __BUILD_MEMORY_STRING(bwlq, type)				\
 									\
 static inline void writes##bwlq(volatile void __iomem *mem,		\
