@@ -158,6 +158,7 @@ void arch_setup_gd(gd_t *gd_ptr);
 /* common/board_r.c */
 void board_init_r(gd_t *id, ulong dest_addr) __attribute__ ((noreturn));
 
+int arch_misc_init(void);
 int cpu_init_r(void);
 int last_stage_init(void);
 int mac_read_from_eeprom(void);
