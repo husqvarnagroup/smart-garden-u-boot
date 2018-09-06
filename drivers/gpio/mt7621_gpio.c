@@ -58,7 +58,7 @@ static int mediatek_gpio_get_value(struct udevice *dev, unsigned offset)
 {
 	struct mediatek_gpio_platdata *plat = dev_get_platdata(dev);
 
-	printf("%s (%d): bank=%d offset=%d\n", __func__, __LINE__, plat->bank, offset); // test-only
+//	printf("%s (%d): bank=%d offset=%d\n", __func__, __LINE__, plat->bank, offset); // test-only
 	return !!(mtk_gpio_r32(plat->bank, GPIO_REG_DATA) & BIT(offset));
 }
 
@@ -67,7 +67,7 @@ static int mediatek_gpio_set_value(struct udevice *dev, unsigned offset,
 {
 	struct mediatek_gpio_platdata *plat = dev_get_platdata(dev);
 
-	printf("%s (%d): bank=%d offset=%d val=%d\n", __func__, __LINE__, plat->bank, offset, value); // test-only
+//	printf("%s (%d): bank=%d offset=%d val=%d\n", __func__, __LINE__, plat->bank, offset, value); // test-only
 	mtk_gpio_w32(plat->bank, (value) ? GPIO_REG_DSET : GPIO_REG_DCLR, BIT(offset));
 
 	return 0;
@@ -91,7 +91,8 @@ static int mediatek_gpio_direction_output(struct udevice *dev, unsigned offset,
 	struct mediatek_gpio_platdata *plat = dev_get_platdata(dev);
 	u32 t;
 
-	printf("%s (%d): bank=%d offset=%d\n", __func__, __LINE__, plat->bank, offset); // test-only
+//	printf("%s (%d): bank=%d offset=%d\n", __func__, __LINE__, plat->bank, offset); // test-only
+	// test-only: use clrbits_le32 etc
 	t = mtk_gpio_r32(plat->bank, GPIO_REG_CTRL);
 	t |= BIT(offset);
 	mtk_gpio_w32(plat->bank, GPIO_REG_CTRL, t);
@@ -147,7 +148,6 @@ static int gpio_mediatek_probe(struct udevice *dev)
 	struct mediatek_gpio_platdata *plat = dev_get_platdata(dev);
 	struct gpio_dev_priv *uc_priv = dev_get_uclass_priv(dev);
 
-	printf("%s (%d)\n", __func__, __LINE__); // test-only
 	/* Tell the uclass how many GPIOs we have */
 	if (plat) {
 		uc_priv->gpio_count = plat->gpio_count;
