@@ -28,32 +28,37 @@
 		power_blue {
 			label = "smartgw:power:blue";
 			gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
-			default-state = "on";
+			default-state = "off";
 		};
 
 		power_green {
 			label = "smartgw:power:green";
 			gpios = <&gpio0 19 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
 		};
 
 		power_red {
 			label = "smartgw:power:red";
 			gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
 		};
 
 		internet_blue {
 			label = "smartgw:internet:blue";
 			gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
 		};
 
 		internet_green {
 			label = "smartgw:internet:green";
 			gpios = <&gpio0 27 GPIO_ACTIVE_HIGH>;
+			default-state = "on";
 		};
 
 		internet_red {
 			label = "smartgw:internet:red";
 			gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
 		};
 	};
 
