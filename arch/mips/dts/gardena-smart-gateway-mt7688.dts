@@ -25,34 +25,34 @@
 	leds {
 		compatible = "gpio-leds";
 
-		blue_led1 {
-			label = "smartgw:blue:led1";
+		power_blue {
+			label = "smartgw:power:blue";
 			gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
 			default-state = "on";
 		};
 
-		green_led1 {
-			label = "smartgw:green:led1";
+		power_green {
+			label = "smartgw:power:green";
 			gpios = <&gpio0 19 GPIO_ACTIVE_HIGH>;
 		};
 
-		red_led1 {
-			label = "smartgw:red:led1";
+		power_red {
+			label = "smartgw:power:red";
 			gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>;
 		};
 
-		blue_led2 {
-			label = "smartgw:blue:led2";
+		internet_blue {
+			label = "smartgw:internet:blue";
 			gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
 		};
 
-		green_led2 {
-			label = "smartgw:green:led2";
+		internet_green {
+			label = "smartgw:internet:green";
 			gpios = <&gpio0 27 GPIO_ACTIVE_HIGH>;
 		};
 
-		red_led2 {
-			label = "smartgw:red:led2";
+		internet_red {
+			label = "smartgw:internet:red";
 			gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
 		};
 	};
