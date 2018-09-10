@@ -52,16 +52,4 @@
  */
 #define CONFIG_BOARD_SIZE_LIMIT		CONFIG_ENV_OFFSET
 
-#define CONFIG_EXTRA_ENV_SETTINGS				\
-	"bootcmd=ping ${serverip};run net_nfs\0"		\
-	"loadaddr=0x81000000\0"					\
-	"tftpdir=gardena\0"					\
-	"tftpram=tftp 80010000 ${tftpdir}/u-boot.bin;go 80010000\0" \
-	"net_nfs=tftp 80a00000 /tftpboot/gardena/uImage;setenv rootpath /tftpboot/gardena/work/rootfs/yocto-2018-08-09;setenv bootargs console=ttyS0,57600 root=/dev/nfs rw nfsroot=${serverip}:${rootpath},tcp,nfsvers=3 ip=${ipaddr}:${serverip}::${netmask}:${hostname}:eth0:off;bootm 80a00000\0"		\
-	"net_ubifs=tftp 80a00000 /tftpboot/gardena/uImage;setenv bootargs root=ubi0:overlay rootfstype=ubifs ubi.mtd=5 init=/sbin/init;bootm 80a00000\0" \
-	"load_uboot=tftp ${loadaddr} ${tftpdir}/u-boot.bin\0"	\
-	"update_uboot=sf probe;"				\
-		"sf update ${loadaddr} 0 ${filesize};saveenv\0"	\
-	"upd_uboot=run load_uboot update_uboot\0"
-
 #endif /* __CONFIG_GARDENA_SMART_GATEWAY_H */
