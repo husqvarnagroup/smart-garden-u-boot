@@ -123,8 +123,6 @@ int board_late_init(void)
 	if (IS_ENABLED(CONFIG_LED))
 		led_default_state();
 
-	otp_env_config();
-
 	return 0;
 }
 
