@@ -654,6 +654,14 @@ static int mt76xx_eth_write_hwaddr(struct udevice *dev)
 
 static int mt76xx_eth_recv(struct udevice *dev, int flags, uchar **packetp); // test-only
 
+static int phy_link_up(void)
+{
+	u32 val;
+
+	mii_mgr_read(0x00, MII_BMSR, &val);
+	return !!(val & BMSR_LSTATUS);
+}
+
 static int mt76xx_eth_start(struct udevice *dev)
 {
 	struct mt76xx_eth_dev *priv = dev_get_priv(dev);
@@ -735,6 +743,30 @@ static int mt76xx_eth_start(struct udevice *dev)
 	wmb(); // test-only
 	eth_dma_start();
 //	printf("%s (%d): RX_CALC_IDX0=%d RX_DRX_IDX0=%d PDMA_INFO=%08x PDMA_GLO_CFG=%08x\n", __func__, __LINE__, RALINK_REG(RX_CALC_IDX0), RALINK_REG(RX_DRX_IDX0), RALINK_REG(PDMA_INFO), RALINK_REG(PDMA_GLO_CFG)); // test-only
+
+#if 1 // test-only
+#define LINK_DELAY_TIME	500		/* 500 ms */
+#define LINK_TIMEOUT	10000		/* 10 seconds */
+
+	if (!phy_link_up()) {
+		/* Wait for link to come up */
+
+		printf("Waiting for link to come up .");
+		for (i = 0; i < (LINK_TIMEOUT / LINK_DELAY_TIME); i++) {
+			mdelay(LINK_DELAY_TIME);
+			if (phy_link_up())
+				break;
+
+			printf(".");
+		}
+
+		if (phy_link_up())
+			printf(" done\n");
+		else
+			printf(" timeout! Trying anyways\n");
+	}
+#endif
+
 #if 0 // test-only: this crashes in free in the hush shell
 	uchar *packet;
 	packet = malloc(2048);
