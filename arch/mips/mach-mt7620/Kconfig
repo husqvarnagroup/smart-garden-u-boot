@@ -13,6 +13,7 @@ choice
 config SOC_MT7620
 	bool "MT7620/8"
 	select MIPS_L1_CACHE_SHIFT_5
+	select SYS_MIPS_CACHE_INIT_RAM_LOAD
 	help
 	  This supports MediaTek MIPS MT7620 family.
 
