@@ -74,3 +74,5 @@ CONFIG_LZMA=y
 CONFIG_VERSION_VARIABLE=y
 CONFIG_ENV_VARS_UBOOT_CONFIG=y
 CONFIG_CMD_BOOTCOUNT=y
+CONFIG_USE_BOOTCOMMAND=y
+CONFIG_BOOTCOMMAND="cp.b 83000000 84000000 10000 && dhcp uEnv.txt && env import -t ${fileaddr} ${filesize} && run do_u_boot_init; reset"
