@@ -178,6 +178,20 @@ int board_late_init(void)
 	return 0;
 }
 
+static void copy_or_generate_uuid(char *fd_ptr, char *env_var_name) {
+	char str[UUID_STR_LEN + 1];	/* Enough for UUID stuff */
+	char *env;
+	
+	/* Don't use the UUID dest place, as the \0 char won't fit */
+	env = env_get(env_var_name);
+	if (env) {
+		memcpy(fd_ptr, env, UUID_STR_LEN);
+	} else {
+		gen_rand_uuid_str(str, UUID_STR_FORMAT_STD);
+		memcpy(fd_ptr, str, UUID_STR_LEN);
+	}
+}
+
 /*
  * Helper function to provide some sane factory-data values for testing
  * purpose, when these values are not programmed correctly
@@ -186,7 +200,6 @@ int do_fd_write(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	struct factory_data_values *fd;
 	struct spi_flash *sf;
-	char str[UUID_STR_LEN + 1];	/* Enough for UUID stuff */
 	u8 *buf;
 	int ret = CMD_RET_FAILURE;
 
@@ -211,24 +224,26 @@ int do_fd_write(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	ret = spi_flash_read(sf, FACTORY_DATA_OFFS, FACTORY_DATA_SECT_SIZE,
 			     (void *)buf);
 	if (ret) {
-		printf("F-Data:spi_flash_erase failed (%d)\n", ret);
+		printf("F-Data:spi_flash_read failed (%d)\n", ret);
 		goto err;
 	}
 
 	fd = (struct factory_data_values *)buf;
 	fd->magic = FACTORY_DATA_MAGIC;
-	fd->version = 0x100;
+	fd->version = 0x1;
 
-	/* Generate some random values for MACs and UUIDs */
-	net_random_ethaddr(fd->wifi_mac);
-	mdelay(10);	/* to get a different seed value for the MAC address */
-	net_random_ethaddr(fd->eth_mac);
-	/* Don't use the UUID dest place, as the \0 char won't fit */
-	gen_rand_uuid_str(str, UUID_STR_FORMAT_STD);
-	memcpy(fd->ipr_id, str, UUID_STR_LEN);
-	gen_rand_uuid_str(str, UUID_STR_FORMAT_STD);
-	memcpy(fd->hqv_id, str, UUID_STR_LEN);
-	strcpy(fd->unielec_id, "3581802200315");
+	/* Use existing MAC and UUID values or generate some random ones */
+	if(!eth_env_get_enetaddr("wifiaddr", fd->wifi_mac)) {
+		net_random_ethaddr(fd->wifi_mac);
+		mdelay(10);	/* to get a different seed value for the MAC address */
+	}
+	if(!eth_env_get_enetaddr("ethaddr", fd->eth_mac)) {
+		net_random_ethaddr(fd->eth_mac);
+	}
+
+	copy_or_generate_uuid(fd->ipr_id, "linuxmoduleid");
+	copy_or_generate_uuid(fd->hqv_id, "linuxmodulehqvid");
+	copy_or_generate_uuid(fd->unielec_id, "linuxmoduleunielecid");
 
 	printf("New factory-data values:\n");
 	printf("wifiaddr=%pM\n", fd->wifi_mac);
