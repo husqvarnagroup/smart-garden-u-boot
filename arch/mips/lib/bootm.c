@@ -119,7 +119,13 @@ static void linux_cmdline_append(bootm_headers_t *images)
 	ulong mem, rd_start, rd_size;
 
 	/* append mem */
+#if 0 // test-only
 	mem = gd->ram_size >> 20;
+#else
+	/* Use memory size below U-Boot for Linux (offset for stack usage) */
+	mem = (gd->start_addr_sp - CONFIG_SYS_SDRAM_BASE - (64 << 10)) >> 20;
+	printf("Using mem=%luM for Linux\n", mem);
+#endif
 	sprintf(buf, "mem=%luM", mem);
 	linux_cmdline_set(buf, strlen(buf));
 
