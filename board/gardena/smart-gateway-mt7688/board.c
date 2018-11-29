@@ -155,7 +155,7 @@ static void factory_data_env_config(void)
 	env_updated |= prepare_uuid_var(fd->ipr_id, "linuxmoduleid", 'X');
 	env_updated |= prepare_uuid_var(fd->hqv_id, "linuxmodulehqvid", '\0');
 	env_updated |= prepare_uuid_var(fd->unielec_id,
-					"linuxmoduleunielecid", 'X');
+					"linuxmoduleunielecid", '\0');
 
 	/* Check if the environment was updated and needs to get stored */
 	if (env_updated != 0) {
