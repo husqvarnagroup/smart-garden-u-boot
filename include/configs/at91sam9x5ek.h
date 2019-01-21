@@ -19,6 +19,9 @@
 
 #define CONFIG_AT91SAM9X5EK
 
+/* Enable board_late_init() function */
+#define CONFIG_BOARD_LATE_INIT
+
 #define CONFIG_CMDLINE_TAG		/* enable passing of ATAGs */
 #define CONFIG_SETUP_MEMORY_TAGS
 #define CONFIG_INITRD_TAG
@@ -35,13 +38,41 @@
 #define CONFIG_ATMEL_LEGACY		/* required until (g)pio is fixed */
 #define CONFIG_AT91_GPIO
 
+/* LEDs */
+#define	STATUS_LED_RED		AT91_PIN_PC19   /* this is the power led */
+#define	STATUS_LED_GREEN	AT91_PIN_PC20	/* this is the user led */
+#define STATUS_LED_BLUE		AT91_PIN_PC21
+#define STATUS_LED_YELLOW	1
+#define STATUS_LED_YELLOW1	2
+#define STATUS_LED_WHITE	1
+#define STATUS_LED_WHITE1	2
+
+#define CONFIG_BOARD_SPECIFIC_LED
+
+#define CONFIG_STATUS_LED
+#define CONFIG_GPIO_LED
+#define CONFIG_GPIO
+/*#define CONFIG_DM_GPIO */
+
+#define STATUS_LED_BIT		(0 + 0x40 + 13)
+#define STATUS_LED_PERIOD	(CONFIG_SYS_HZ / 2)
+#define STATUS_LED_STATE	STATUS_LED_BLINKING
+
+#define STATUS_LED_BIT1		(0 + 0x40 + 14)
+#define STATUS_LED_PERIOD1	(CONFIG_SYS_HZ / 2)
+#define STATUS_LED_STATE1	STATUS_LED_BLINKING
+
+#define STATUS_LED_BIT2		(0 + 0x40 + 15)
+#define STATUS_LED_PERIOD2	2
+#define STATUS_LED_STATE2	STATUS_LED_BLINKING
+
 /* serial console */
 #define CONFIG_ATMEL_USART
 #define CONFIG_USART_BASE	ATMEL_BASE_DBGU
 #define CONFIG_USART_ID		ATMEL_ID_SYS
 
 /* LCD */
-#define CONFIG_LCD
+/*#define CONFIG_LCD
 #define LCD_BPP			LCD_COLOR16
 #define LCD_OUTPUT_BPP		24
 #define CONFIG_LCD_LOGO
@@ -52,7 +83,8 @@
 #define CONFIG_ATMEL_LCD_RGB565
 #define CONFIG_SYS_CONSOLE_IS_IN_ENV
 
-#define CONFIG_BOOTDELAY	3
+*/
+#define CONFIG_BOOTDELAY	1
 
 /*
  * BOOTP options
@@ -72,6 +104,7 @@
 #undef CONFIG_CMD_FPGA
 #undef CONFIG_CMD_IMI
 
+#define CONFIG_CMD_LED
 #define CONFIG_CMD_PING
 #define CONFIG_CMD_DHCP
 #define CONFIG_CMD_NAND
@@ -137,6 +170,14 @@
 #define CONFIG_MMC
 #define CONFIG_GENERIC_MMC
 #define CONFIG_GENERIC_ATMEL_MCI
+#define CONFIG_CMD_FAT
+#define CONFIG_CMD_EXT2
+#define CONFIG_CMD_EXT4
+#define CONFIG_CMD_FS_GENERIC
+
+/* bootz: zImage/initrd.img support */
+#define CONFIG_CMD_BOOTZ
+#define CONFIG_SUPPORT_RAW_INITRD
 #endif
 
 /* FAT */
@@ -175,9 +216,10 @@
 #ifdef CONFIG_SYS_USE_NANDFLASH
 /* bootstrap + u-boot + env + linux in nandflash */
 #define CONFIG_ENV_IS_IN_NAND
-#define CONFIG_ENV_OFFSET		0xc0000
-#define CONFIG_ENV_OFFSET_REDUND	0x100000
+#define CONFIG_ENV_OFFSET		0x180000
+#define CONFIG_ENV_OFFSET_REDUND	0x220000
 #define CONFIG_ENV_SIZE		0x20000		/* 1 sector = 128 kB */
+#define CONFIG_ENV_RANGE	0xA0000 	/* 6 pages per env partition */
 #define CONFIG_BOOTCOMMAND	"nand read " \
 				"0x22000000 0x200000 0x300000; " \
 				"bootm 0x22000000"
@@ -211,18 +253,51 @@
 #endif
 
 #ifdef CONFIG_SYS_USE_MMC
-#define CONFIG_BOOTARGS		"mem=128M console=ttyS0,115200 " \
-				"mtdparts=atmel_nand:" \
-				"8M(bootstrap/uboot/kernel)ro,-(rootfs) " \
-				"root=/dev/mmcblk0p2 " \
-				"rw rootfstype=ext4 rootwait"
-#else
-#define CONFIG_BOOTARGS							\
-	"console=ttyS0,115200 earlyprintk "				\
-	"mtdparts=atmel_nand:256k(bootstrap)ro,512k(uboot)ro,"		\
-	"256k(env),256k(env_redundant),256k(spare),"			\
-	"512k(dtb),6M(kernel)ro,-(rootfs) "				\
-	"rootfstype=ubifs ubi.mtd=7 root=ubi0:rootfs rw"
+#define CONFIG_EXTRA_ENV_SETTINGS \
+	"initrd_high=0xffffffff\0" \
+	"fdt_high=0xffffffff\0" \
+	"loadaddr=0x22000000\0" \
+	"fdtaddr=0x27FF0000\0" \
+	"fdtfile=/dtbs/at91sam9g25ek.dtb\0" \
+	"console=ttyS0,115200n8\0" \
+	"optargs=\0" \
+	"video=\0" \
+	"mmcdev=0\0" \
+	"mmcpart=1\0" \
+	"mmcroot=/dev/mmcblk0p2 ro\0" \
+	"mmcrootfstype=ext4 rootwait\0" \
+	"mmcargs=setenv bootargs console=${console} " \
+		"${optargs} " \
+		"root=${mmcroot} " \
+		"rootfstype=${mmcrootfstype} " \
+		"video=${video}\0" \
+	"loadbootenv=load mmc ${mmcdev}:${mmcpart} ${loadaddr} uEnv.txt\0" \
+	"importbootenv=echo Importing environment from mmc (uEnv.txt)...; " \
+		"env import -t ${loadaddr} ${filesize}\0" \
+	"loadzimage=load mmc ${mmcdev}:${mmcpart} ${loadaddr} zImage\0" \
+	"loadfdt=load mmc ${mmcdev}:${mmcpart} ${fdtaddr} ${fdtfile}\0" \
+	"mmcboot=echo Booting from mmc ...; " \
+		"run mmcargs; " \
+		"bootz ${loadaddr} - ${fdtaddr}\0"
+
+#define CONFIG_BOOTCOMMAND \
+	"mmc dev ${mmcdev};" \
+	"if mmc rescan; then " \
+		"echo SD/MMC found on device ${mmcdev};" \
+		"if run loadbootenv; then " \
+			"run importbootenv;" \
+		"fi;" \
+		"echo Checking if uenvcmd is set ...;" \
+		"if test -n $uenvcmd; then " \
+			"echo Running uenvcmd ...;" \
+			"run uenvcmd;" \
+		"fi;" \
+		"echo Running default loadzimage ...;" \
+		"if run loadzimage; then " \
+			"run loadfdt;" \
+			"run mmcboot;" \
+		"fi;" \
+	"fi;"
 #endif
 
 #define CONFIG_BAUDRATE		115200

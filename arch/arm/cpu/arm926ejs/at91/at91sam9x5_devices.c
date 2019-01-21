@@ -66,7 +66,7 @@ void at91_seriald_hw_init(void)
 {
 	at91_pmc_t *pmc = (at91_pmc_t *) ATMEL_BASE_PMC;
 
-	at91_set_a_periph(AT91_PIO_PORTA, 9, 0);	/* DRXD */
+	at91_set_a_periph(AT91_PIO_PORTA, 9, 1);	/* DRXD */
 	at91_set_a_periph(AT91_PIO_PORTA, 10, 1);	/* DTXD */
 
 	writel(1 << ATMEL_ID_SYS, &pmc->pcer);

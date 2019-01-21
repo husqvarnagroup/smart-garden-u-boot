@@ -14,6 +14,7 @@
 #include <config.h>
 #include <command.h>
 #include <status_led.h>
+#include <asm/arch/gpio.h>
 
 struct led_tbl_s {
 	char		*string;	/* String for use in the command */
@@ -28,13 +29,13 @@ typedef struct led_tbl_s led_tbl_t;
 static const led_tbl_t led_commands[] = {
 #ifdef CONFIG_BOARD_SPECIFIC_LED
 #ifdef STATUS_LED_BIT
-	{ "0", STATUS_LED_BIT, NULL, NULL, NULL },
+	{ "red1", STATUS_LED_BIT, NULL, NULL, NULL },
 #endif
 #ifdef STATUS_LED_BIT1
-	{ "1", STATUS_LED_BIT1, NULL, NULL, NULL },
+	{ "green1", STATUS_LED_BIT1, NULL, NULL, NULL },
 #endif
 #ifdef STATUS_LED_BIT2
-	{ "2", STATUS_LED_BIT2, NULL, NULL, NULL },
+	{ "blue1", STATUS_LED_BIT2, NULL, NULL, NULL },
 #endif
 #ifdef STATUS_LED_BIT3
 	{ "3", STATUS_LED_BIT3, NULL, NULL, NULL },
@@ -52,10 +53,19 @@ static const led_tbl_t led_commands[] = {
 #ifdef STATUS_LED_BLUE
 	{ "blue", STATUS_LED_BLUE, blue_led_off, blue_led_on, NULL },
 #endif
+#ifdef STATUS_LED_YELLOW1
+	{ "yellow1", STATUS_LED_YELLOW1, yellow1_led_off, yellow1_led_on, NULL },
+#endif
+#ifdef STATUS_LED_WHITE
+	{ "white", STATUS_LED_WHITE, white_led_off, white_led_on, NULL },
+#endif
+#ifdef STATUS_LED_WHITE1
+	{ "white1", STATUS_LED_WHITE1, white1_led_off, white1_led_on, NULL },
+#endif
 	{ NULL, 0, NULL, NULL, NULL }
 };
 
-enum led_cmd { LED_ON, LED_OFF, LED_TOGGLE };
+enum led_cmd { LED_ON, LED_OFF, LED_TOGGLE, LED_FLASH };
 
 enum led_cmd get_led_cmd(char *var)
 {
@@ -67,6 +77,8 @@ enum led_cmd get_led_cmd(char *var)
 	}
 	if (strcmp(var, "toggle") == 0)
 		return LED_TOGGLE;
+	if (strcmp(var, "flash") == 0)
+		return LED_FLASH;
 	return -1;
 }
 
@@ -109,6 +121,20 @@ int do_led (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 					led_commands[i].toggle();
 				else
 					__led_toggle(led_commands[i].mask);
+				break;
+			case LED_FLASH:
+				if (led_commands[i].on)
+					led_commands[i].on();
+				else
+					__led_set(led_commands[i].mask,
+							  STATUS_LED_ON);
+				mdelay(100);
+				if (led_commands[i].off)
+					led_commands[i].off();
+				else
+					__led_set(led_commands[i].mask,
+							  STATUS_LED_OFF);
+				break;
 			}
 			/* Need to set only 1 led if led_name wasn't 'all' */
 			if (strcmp("all", argv[1]) != 0)
@@ -124,18 +150,21 @@ int do_led (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	return 0;
 }
 
+/*
+
+*/
 U_BOOT_CMD(
 	led, 3, 1, do_led,
 	"["
 #ifdef CONFIG_BOARD_SPECIFIC_LED
 #ifdef STATUS_LED_BIT
-	"0|"
+	"red1|"
 #endif
 #ifdef STATUS_LED_BIT1
-	"1|"
+	"green1|"
 #endif
 #ifdef STATUS_LED_BIT2
-	"2|"
+	"blue1|"
 #endif
 #ifdef STATUS_LED_BIT3
 	"3|"
@@ -146,6 +175,15 @@ U_BOOT_CMD(
 #endif
 #ifdef STATUS_LED_YELLOW
 	"yellow|"
+#endif
+#ifdef STATUS_LED_YELLOW1
+	"yellow1|"
+#endif
+#ifdef STATUS_LED_WHITE
+	"white|"
+#endif
+#ifdef STATUS_LED_WHITE
+	"white1|"
 #endif
 #ifdef STATUS_LED_RED
 	"red|"

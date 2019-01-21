@@ -129,6 +129,12 @@ void yellow_led_on(void);
 void yellow_led_off(void);
 void blue_led_on(void);
 void blue_led_off(void);
+void yellow1_led_on(void);
+void yellow1_led_off(void);
+void white_led_on(void);
+void white_led_off(void);
+void white1_led_on(void);
+void white1_led_off(void);
 #else
 	.extern LED_init
 	.extern red_led_on

@@ -32,6 +32,8 @@ obj-$(CONFIG_DISPLAY_BOARDINFO_LATE) += board_info.o
 
 # core command
 obj-y += cmd_boot.o
+obj-y += cmd_led.o
+obj-y += cmd_antena.o
 obj-$(CONFIG_CMD_BOOTM) += cmd_bootm.o bootm.o bootm_os.o
 obj-y += cmd_help.o
 obj-y += cmd_version.o

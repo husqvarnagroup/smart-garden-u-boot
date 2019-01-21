@@ -29,6 +29,7 @@
 #endif
 
 DECLARE_GLOBAL_DATA_PTR;
+bool recBtnPressed;
 
 /* ------------------------------------------------------------------------- */
 /*
@@ -255,6 +256,13 @@ int board_mmc_init(bd_t *bd)
 int board_early_init_f(void)
 {
 	at91_seriald_hw_init();
+	at91_set_pio_output(AT91_PIO_PORTC, 19, 0);
+	at91_set_pio_output(AT91_PIO_PORTC, 20, 0);
+	at91_set_pio_output(AT91_PIO_PORTC, 21, 0);
+
+	at91_set_pio_output(AT91_PIO_PORTC, 13, 0);
+	at91_set_pio_output(AT91_PIO_PORTC, 14, 0);
+	at91_set_pio_output(AT91_PIO_PORTC, 15, 0);
 	return 0;
 }
 
@@ -284,6 +292,22 @@ int board_init(void)
 #ifdef CONFIG_LCD
 	at91sam9x5ek_lcd_hw_init();
 #endif
+
+	at91_set_pio_value(AT91_PIO_PORTC, 19, 0);
+	at91_set_pio_input(AT91_PIO_PORTA, 24, 0);
+	udelay(1000);
+	recBtnPressed=at91_get_pio_value(AT91_PIO_PORTA,24); /* GPIO_PA24 high if button pressed */
+
+	return 0;
+}
+
+int board_late_init(void)
+{
+	if (!recBtnPressed) {
+		printf("Recovery button pressed\n");
+		setenv("recBtnPressed", "true");
+	}
+
 	return 0;
 }
 
@@ -292,4 +316,83 @@ int dram_init(void)
 	gd->ram_size = get_ram_size((void *) CONFIG_SYS_SDRAM_BASE,
 					CONFIG_SYS_SDRAM_SIZE);
 	return 0;
+}
+
+void coloured_LED_init(void)
+{
+at91_set_pio_output(AT91_PIO_PORTC, 19, 0);
+at91_set_pio_output(AT91_PIO_PORTC, 20, 0);
+at91_set_pio_output(AT91_PIO_PORTC, 21, 0);
+}
+
+void red_led_on(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 19, 1);
+}
+void red_led_off(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 19, 0);
+}
+void green_led_on(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 20, 1);
+}
+void green_led_off(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 20, 0);
+}
+void yellow_led_on(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 19, 1);
+at91_set_pio_value(AT91_PIO_PORTC, 20, 1);
+}
+void yellow_led_off(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 19, 0);
+at91_set_pio_value(AT91_PIO_PORTC, 20, 0);
+}
+void blue_led_on(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 21, 1);
+}
+void blue_led_off(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 21, 0);
+}
+
+void yellow1_led_on(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 13, 1);
+at91_set_pio_value(AT91_PIO_PORTC, 14, 1);
+}
+void yellow1_led_off(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 13, 0);
+at91_set_pio_value(AT91_PIO_PORTC, 14, 0);
+}
+
+void white_led_on(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 19, 1);
+at91_set_pio_value(AT91_PIO_PORTC, 20, 1);
+at91_set_pio_value(AT91_PIO_PORTC, 21, 1);
+}
+void white_led_off(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 19, 0);
+at91_set_pio_value(AT91_PIO_PORTC, 20, 0);
+at91_set_pio_value(AT91_PIO_PORTC, 21, 0);
+}
+
+void white1_led_on(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 13, 1);
+at91_set_pio_value(AT91_PIO_PORTC, 14, 1);
+at91_set_pio_value(AT91_PIO_PORTC, 15, 1);
+}
+void white1_led_off(void)
+{
+at91_set_pio_value(AT91_PIO_PORTC, 13, 0);
+at91_set_pio_value(AT91_PIO_PORTC, 14, 0);
+at91_set_pio_value(AT91_PIO_PORTC, 15, 0);
 }
