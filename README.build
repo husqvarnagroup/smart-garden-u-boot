@@ -1,0 +1,37 @@
+# Original instructions
+Based on instructions from https://www.digikey.com/eewiki/display/linuxonarm/AT91SAM9x5#AT91SAM9x5-Bootloader:AT91Bootstrap
+
+# Compile u-boot (requires gcc 4.9 on the host)
+1. Get linaro toolchain
+```
+wget https://releases.linaro.org/archive/14.09/components/toolchain/binaries/gcc-linaro-arm-none-eabi-4.9-2014.09_linux.tar.xz
+```
+
+2. Extact the toolchain (change /opt to required destination dir)
+```
+tar -C /opt -xf gcc-linaro-arm-none-eabi-4.9-2014.09_linux.tar.xz
+```
+
+3. Add toolchain to CC env var (adjust dir name if needed)
+```
+export CC=/opt/gcc-linaro-arm-none-eabi-4.9-2014.09_linux/bin/arm-none-eabi-
+```
+
+4. Copy the release config
+```
+cp release.config .config
+```
+
+5. Build u-boot
+```
+make ARCH=arm CROSS_COMPILE=${CC}
+```
+
+# Creating a docker container with the right environment
+
+This is an example which sets up the right build environment in a docker container. Use the following code as your build Dockerfile.
+```
+FROM gcc:4.9
+
+RUN apt update && apt install libc6-i386 libc6-dev-i386 lib32z1 bc
+```
