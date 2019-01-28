@@ -29,9 +29,9 @@ make ARCH=arm CROSS_COMPILE=${CC}
 
 # Creating a docker container with the right environment
 
-This is an example which sets up the right build environment in a docker container. Use the following code as your build Dockerfile.
+This is an example which sets up the right build environment in a docker container.
 ```
-FROM gcc:4.9
-
-RUN apt update && apt install libc6-i386 libc6-dev-i386 lib32z1 bc
+docker build -t smart-garden-u-boot-seluxit smart-garden-u-boot
+docker run -i -t -v "${PWD}/smart-garden-u-boot":/data smart-garden-u-boot-seluxit /bin/bash
+cd /data/
 ```
